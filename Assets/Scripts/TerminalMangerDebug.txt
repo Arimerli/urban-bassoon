@@ -1,0 +1,117 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.InputSystem;
+
+public class TerminalManger : MonoBehaviour
+{
+    public GameObject directoryLine;
+    public GameObject responseLine;
+
+    public InputField terminalInput;
+    public GameObject userInputLine;
+    public ScrollRect sr;
+    public GameObject msgList;
+
+    // Toggle these in Inspector if you want to test behaviours
+    public bool useUpdatePolling = false;
+    public bool useOnEndEditFallback = false;
+
+    void Awake()
+    {
+        if (terminalInput == null)
+            Debug.LogError("TerminalManger: terminalInput is null!");
+
+        // wire up onEndEdit fallback
+        if (useOnEndEditFallback && terminalInput != null)
+        {
+            terminalInput.onEndEdit.AddListener(OnInputEndEdit);
+        }
+    }
+
+    void OnDestroy()
+    {
+        if (terminalInput != null)
+            terminalInput.onEndEdit.RemoveListener(OnInputEndEdit);
+    }
+
+    void Update()
+    {
+        // Debug info every frame (can be noisy; remove after debugging)
+        if (Keyboard.current == null)
+        {
+            Debug.LogWarning("InputSystem: Keyboard.current is null - is the Input System package enabled?");
+            return;
+        }
+
+        bool focused = terminalInput != null && terminalInput.isFocused;
+        string text = terminalInput != null ? terminalInput.text : "(null)";
+        bool wasPressed = Keyboard.current.enterKey.wasPressedThisFrame;
+        bool isPressed = Keyboard.current.enterKey.isPressed;
+
+        // Put a frame log only when Enter was pressed or focus changes - helps debugging
+        if (wasPressed || isPressed)
+            Debug.Log($"[TerminalManger] Frame {Time.frameCount} focused={focused} text=\"{text}\" wasPressed={wasPressed} isPressed={isPressed}");
+
+        if (useUpdatePolling && terminalInput != null)
+        {
+            // Only react when focused and text is not empty and Enter was pressed this frame
+            if (focused && !string.IsNullOrEmpty(text) && wasPressed)
+            {
+                Debug.Log($"[TerminalManger] Submitting from Update() frame {Time.frameCount} text=\"{text}\"");
+                HandleSubmit(text);
+            }
+        }
+    }
+
+    // Fallback: InputField's end edit event. This gets called when InputField loses focus,
+    // e.g., when pressing Enter or clicking away. We check whether Enter triggered it.
+    void OnInputEndEdit(string input)
+    {
+        // Note: onEndEdit is called for both Enter and for lost focus (click away). We use Keyboard.current to detect Enter.
+        bool enterPressed = Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame;
+        Debug.Log($"[TerminalManger] OnEndEdit called (enterPressed={enterPressed}) input=\"{input}\" frame={Time.frameCount}");
+
+        if (useOnEndEditFallback && enterPressed && !string.IsNullOrEmpty(input))
+        {
+            Debug.Log($"[TerminalManger] Submitting from OnEndEdit frame {Time.frameCount} text=\"{input}\"");
+            HandleSubmit(input);
+            // Re-activate input field to allow immediate next input
+            terminalInput.ActivateInputField();
+            terminalInput.Select();
+        }
+    }
+
+    void HandleSubmit(string userInput)
+    {
+        ClearInputField();
+        AddDirectoryLine(userInput);
+        userInputLine.transform.SetAsLastSibling();
+
+        // After adding to list, ensure UI scroll rect moves to bottom
+        Canvas.ForceUpdateCanvases();
+        if (sr != null)
+            sr.verticalNormalizedPosition = 0f;
+    }
+
+    void ClearInputField()
+    {
+        terminalInput.text = "";
+    }
+
+    void AddDirectoryLine(string userInput)
+    {
+        var msgListRect = msgList.GetComponent<RectTransform>();
+        msgListRect.sizeDelta = new Vector2(msgListRect.sizeDelta.x, msgListRect.sizeDelta.y + 35f);
+
+        GameObject msg = Instantiate(directoryLine, msgList.transform);
+        msg.transform.SetSiblingIndex(msgList.transform.childCount - 1);
+
+        var texts = msg.GetComponentsInChildren<Text>();
+        if (texts.Length > 1)
+            texts[1].text = userInput;
+        else if (texts.Length == 1)
+            texts[0].text = userInput;
+        else
+            Debug.LogWarning("DirectoryLine prefab has no Text components!");
+    }
+}
