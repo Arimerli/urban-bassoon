@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
 using UnityEngine.Rendering.RenderGraphModule;
+using Unity.VisualScripting;
 
 public class TerminalManager : MonoBehaviour
 {
@@ -11,14 +12,17 @@ public class TerminalManager : MonoBehaviour
     public GameObject userInputLine;
     public GameObject directoryLine;
     public GameObject responseLine;
-    public ScrollRect sr;
     public GameObject msgList;
 
     Interpreter interpreter;
 
+
     private void Start()
     {
-        interpreter = GetComponent<Interpreter>();
+        interpreter = new Interpreter();
+
+        if (interpreter == null)
+            Debug.LogError("Interpreter component NOT FOUND on this GameObject!");
     }
 
     void Awake()
@@ -63,25 +67,29 @@ public class TerminalManager : MonoBehaviour
     private void HandleSubmit(string userInput)
     {
         AddDirectoryLine(userInput);
-        AddInterpreterLines(interpreter.InterpretCommand(userInput));
+        AddInterpreterLines(interpreter.Interpret(userInput));
 
         // Move user input line to bottom
         if (userInputLine != null)
+        {
+            string[] args = userInput.Split();
+            if (args[0] == "port")
+            {
+                userInputLine.TryGetComponent<setPortOnRequest>(out var dirText);
+                dirText.SetDirectoryText("admin@server/" + args[0] + "_" + args[1] + " >");
+            } 
             userInputLine.transform.SetAsLastSibling();
-
+        }
         // Scroll to bottom
         Canvas.ForceUpdateCanvases();
-        if (sr != null)
-            sr.verticalNormalizedPosition = 0f;
     }
 
     private void AddDirectoryLine(string userInput)
     {
         GameObject msg = Instantiate(directoryLine, msgList.transform);
         msg.transform.SetSiblingIndex(msgList.transform.childCount - 1);
-
-        DirectoryLine dir = msg.GetComponent<DirectoryLine>();
-        if (dir != null)
+ 
+        if (msg.TryGetComponent<DirectoryLine>(out var dir))
             dir.SetText(userInput);
         else
         {
@@ -103,8 +111,7 @@ public class TerminalManager : MonoBehaviour
             GameObject res = Instantiate(responseLine, msgList.transform);
             res.transform.SetAsLastSibling();
 
-            ReponseLine rsp = res.GetComponent<ReponseLine>();
-            if (rsp != null)
+            if (res.TryGetComponent<ReponseLine>(out var rsp))
                 rsp.SetText(rispostaTerminale[i]);
             else
             {

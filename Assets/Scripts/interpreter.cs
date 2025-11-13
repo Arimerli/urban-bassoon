@@ -1,29 +1,48 @@
+using System;
 using System.Collections.Generic;
-using System.Security.Cryptography;
-using UnityEditor.Compilation;
+using Mono.Cecil.Cil;
 using UnityEngine;
 
-public class Interpreter : MonoBehaviour
+public class Interpreter 
 {
-    List<string> risposta = new();
+    MainHandler main = new MainHandler();
+    int portaCorrente = 0;
 
-    public List<string> InterpretCommand(string userInput)
+    Dictionary<int, Func<string, List<string>>> comandi;
+    List<string> tempRisp;
+
+    public List<string> Interpret(string userInput)
     {
-        risposta.Clear();
-
+        comandi = new Dictionary<int, Func<string, List<string>>>()
+        {
+            {0, main.InterpretCommand}
+        };
+        
         string[] args = userInput.Split();
+        GameGlobals.risposta.Clear();
 
-        if(args[0] == "help")
+        if (portaCorrente == 0)
         {
-            risposta.Add("Terminale del Server | Online");
-            risposta.Add("Scrivi `help --list` per una lista di comandi");
-
-            return risposta;
-        } else
+            if (args[0] == "port")
+            {
+                portaCorrente = int.Parse(args[1]);
+                return GameGlobals.risposta;
+            }
+            tempRisp = comandi[0](args[0]);
+            for (int x = 0;x<tempRisp.Count;x++)
+            {
+                GameGlobals.risposta.Add(tempRisp[x]);
+            }
+            return GameGlobals.risposta;
+        }
+        else
         {
-            risposta.Add("Comando non riconosciuto, digita help per ulteriori aiuti");
-
-            return risposta;
+            return GameGlobals.risposta;
         }
     }
+}
+
+public class GameGlobals
+{
+    public static List<string> risposta = new();
 }
